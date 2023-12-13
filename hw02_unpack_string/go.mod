@@ -1,4 +1,4 @@
-module github.com/fixme_my_friend/hw02_unpack_string
+module github.com/evgenii1452/hw-go-otus/hw02_unpack_string
 
 go 1.19
 
