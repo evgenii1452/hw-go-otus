@@ -31,11 +31,11 @@ func Unpack(str string) (string, error) {
 			result.WriteString(string(prevRune))
 		}
 
-		if i == len(str)-1 && !unicode.IsDigit(currentRune) {
-			result.WriteString(string(currentRune))
-		}
-
 		prevRune = currentRune
+	}
+
+	if len(str) > 0 && !unicode.IsDigit(prevRune) {
+		result.WriteString(string(prevRune))
 	}
 
 	return result.String(), nil
