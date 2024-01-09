@@ -80,6 +80,12 @@ func (l *list) PushBack(v interface{}) *ListItem {
 func (l *list) Remove(i *ListItem) {
 	defer func() { l.length-- }()
 
+	if l.length == 1 {
+		l.firstItem = nil
+		l.lastItem = nil
+		return
+	}
+
 	if i.Prev == nil {
 		i.Next.Prev = nil
 		l.firstItem = i.Next

@@ -1,9 +1,5 @@
 package hw04lrucache
 
-import (
-	"fmt"
-)
-
 type Key string
 
 type Cache interface {
@@ -63,8 +59,6 @@ func (c *lruCache) Get(key Key) (interface{}, bool) {
 	if !ok {
 		return nil, false
 	}
-
-	fmt.Println(item.Value)
 
 	valueWrapper, ok := item.Value.(listItemValueWrapper)
 	if !ok {
