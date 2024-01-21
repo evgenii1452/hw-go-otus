@@ -67,4 +67,42 @@ func TestRun(t *testing.T) {
 		require.Equal(t, runTasksCount, int32(tasksCount), "not all tasks were completed")
 		require.LessOrEqual(t, int64(elapsedTime), int64(sumTime/2), "tasks were run sequentially?")
 	})
+
+	t.Run("maxErrorsCount less than 1", func(t *testing.T) {
+		tasksCount := 20
+		tasks := make([]Task, 0, tasksCount)
+
+		var runTasksCount int32
+		var sumTime time.Duration
+
+		for i := 0; i < tasksCount; i++ {
+			taskSleep := time.Millisecond * time.Duration(rand.Intn(10))
+			sumTime += taskSleep
+
+			tasks = append(tasks, func() error {
+				time.Sleep(taskSleep)
+				atomic.AddInt32(&runTasksCount, 1)
+				return nil
+			})
+		}
+
+		start := time.Now()
+		err := Run(tasks, 5, 0)
+		elapsedTime := time.Since(start)
+		require.Nil(t, err)
+		require.LessOrEqual(t, int64(elapsedTime), int64(sumTime/2), "tasks were run sequentially?")
+
+		start = time.Now()
+		err = Run(tasks, 5, -1)
+		elapsedTime = time.Since(start)
+		require.Nil(t, err)
+		require.LessOrEqual(t, int64(elapsedTime), int64(sumTime/2), "tasks were run sequentially?")
+	})
+
+	t.Run("incorrect number of workers", func(t *testing.T) {
+		tasks := []Task{func() error { return nil }}
+
+		err := Run(tasks, 0, 10)
+		require.Truef(t, errors.Is(err, ErrIncorrectNumberOfWorkers), "actual err - %v", err)
+	})
 }
