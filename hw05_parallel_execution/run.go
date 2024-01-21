@@ -13,39 +13,42 @@ var (
 
 type Task func() error
 
-// Run starts tasks in n goroutines and stops its work when receiving m errors from tasks.
-func Run(tasks []Task, n, m int) error {
-	if n <= 0 {
-		return ErrIncorrectNumberOfWorkers
-	}
-
-	var errCounter int32
-	taskChan := make(chan Task, len(tasks))
-
-	produce(taskChan, tasks)
-
-	wg := sync.WaitGroup{}
-	wg.Add(n)
-
-	for i := 0; i < n; i++ {
-		go process(taskChan, &errCounter, m, &wg)
-	}
-
-	wg.Wait()
-
-	if m > 0 && int(atomic.LoadInt32(&errCounter)) >= m {
-		return ErrErrorsLimitExceeded
-	}
-
-	return nil
+type producer struct {
+	stopSignalCh <-chan struct{}
+	ch           chan<- Task
+	wg           *sync.WaitGroup
 }
 
-func process(ch <-chan Task, errCounter *int32, maxErrors int, wg *sync.WaitGroup) {
-	defer wg.Done()
+func (p *producer) produce(tasks []Task) {
+	defer func() {
+		close(p.ch)
+		p.wg.Done()
+	}()
 
-	for {
-		task, ok := <-ch
-		if !ok || int(atomic.LoadInt32(errCounter)) >= maxErrors && maxErrors > 0 {
+	for _, task := range tasks {
+		select {
+		case <-p.stopSignalCh:
+			return
+		case p.ch <- task:
+			continue
+		}
+	}
+}
+
+type worker struct {
+	readCh       <-chan Task
+	wg           *sync.WaitGroup
+	errCounter   int32
+	maxErrors    int32
+	stopSignalCh chan<- struct{}
+	stopped      int32
+}
+
+func (w *worker) process() {
+	defer w.wg.Done()
+
+	for task := range w.readCh {
+		if atomic.LoadInt32(&w.stopped) == 1 {
 			return
 		}
 
@@ -53,14 +56,39 @@ func process(ch <-chan Task, errCounter *int32, maxErrors int, wg *sync.WaitGrou
 			continue
 		}
 
-		atomic.AddInt32(errCounter, 1)
+		atomic.AddInt32(&w.errCounter, 1)
+
+		if atomic.LoadInt32(&w.errCounter) >= w.maxErrors && w.maxErrors > 0 && atomic.CompareAndSwapInt32(&w.stopped, 0, 1) {
+			w.stopSignalCh <- struct{}{}
+		}
 	}
 }
 
-func produce(ch chan<- Task, tasks []Task) {
-	defer close(ch)
-
-	for _, task := range tasks {
-		ch <- task
+func Run(tasks []Task, n, m int) error {
+	if n <= 0 {
+		return ErrIncorrectNumberOfWorkers
 	}
+
+	taskCh := make(chan Task)
+	stopSignalCh := make(chan struct{})
+	wg := sync.WaitGroup{}
+
+	producer := &producer{ch: taskCh, wg: &wg, stopSignalCh: stopSignalCh}
+	wg.Add(1)
+	go producer.produce(tasks)
+
+	worker := &worker{readCh: taskCh, wg: &wg, maxErrors: int32(m), stopSignalCh: stopSignalCh}
+
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go worker.process()
+	}
+
+	wg.Wait()
+
+	if m > 0 && int(atomic.LoadInt32(&worker.errCounter)) >= m {
+		return ErrErrorsLimitExceeded
+	}
+
+	return nil
 }
