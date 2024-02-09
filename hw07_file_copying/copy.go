@@ -51,11 +51,15 @@ func Copy(fromPath, toPath string, offset, limit int64) error {
 	if err != nil {
 		return fmt.Errorf("create tmp file: %w", err)
 	}
-	defer tmpFile.Close()
 
 	_, err = io.Copy(tmpFile, readerWithPB)
 	if err != nil {
 		return fmt.Errorf("copy file: %w", err)
+	}
+
+	err = tmpFile.Close()
+	if err != nil {
+		return fmt.Errorf("close tmp file: %w", err)
 	}
 
 	err = os.Rename(tmpFile.Name(), toPath)
