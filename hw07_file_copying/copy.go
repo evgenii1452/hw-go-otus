@@ -47,24 +47,9 @@ func Copy(fromPath, toPath string, offset, limit int64) error {
 	bar := pb.Full.Start64(limit)
 	readerWithPB := bar.NewProxyReader(limitReader)
 
-	tmpFile, err := os.CreateTemp("./", "")
+	err = copyFile(readerWithPB, toPath)
 	if err != nil {
-		return fmt.Errorf("create tmp file: %w", err)
-	}
-
-	_, err = io.Copy(tmpFile, readerWithPB)
-	if err != nil {
-		return fmt.Errorf("copy file: %w", err)
-	}
-
-	err = tmpFile.Close()
-	if err != nil {
-		return fmt.Errorf("close tmp file: %w", err)
-	}
-
-	err = os.Rename(tmpFile.Name(), toPath)
-	if err != nil {
-		return fmt.Errorf("move result file: %w", err)
+		return err
 	}
 
 	bar.Finish()
@@ -87,6 +72,22 @@ func validate(fileInfo os.FileInfo, offset, limit int64) error {
 
 	if fileInfo.IsDir() {
 		return ErrUnsupportedFile
+	}
+
+	return nil
+}
+
+func copyFile(resource io.Reader, copyPath string) error {
+	file, err := os.Create(copyPath)
+	if err != nil {
+		return fmt.Errorf("create file: %w", err)
+	}
+	defer file.Close()
+
+	_, err = io.Copy(file, resource)
+	if err != nil {
+		defer os.Remove(copyPath)
+		return fmt.Errorf("copy file: %w", err)
 	}
 
 	return nil
