@@ -31,7 +31,13 @@ func stageExecute(done In, stage Stage, in In) Out {
 				if !ok {
 					return
 				}
-				resultChannel <- value
+
+				select {
+				case <-done:
+					return
+				case resultChannel <- value:
+					continue
+				}
 			}
 		}
 	}()
