@@ -38,8 +38,9 @@ func TestReadDir(t *testing.T) {
 	t.Run("test success", func(t *testing.T) {
 		envMap := make(map[string]string)
 		envMap["VAR1"] = "VALUE1"
-		envMap["VAR2"] = "VALUE2"
+		envMap["VAR2"] = "VALUE2  \t"
 		envMap["VAR3"] = ""
+		envMap["VAR4=5"] = "VALUE4"
 
 		err := createEnvs(envMap)
 		if err != nil {
@@ -51,6 +52,12 @@ func TestReadDir(t *testing.T) {
 		require.Nil(t, err)
 
 		for k, v := range envs {
+			if k == "VAR2" {
+				require.Equal(t, "VALUE2", v.Value)
+				require.False(t, v.NeedRemove)
+				continue
+			}
+
 			if k == "VAR3" {
 				require.Equal(t, envMap[k], v.Value)
 				require.True(t, v.NeedRemove)
@@ -60,6 +67,9 @@ func TestReadDir(t *testing.T) {
 			require.Equal(t, envMap[k], v.Value)
 			require.False(t, v.NeedRemove)
 		}
+
+		_, ok := envs["VAR4=5"]
+		require.False(t, ok)
 	})
 
 	t.Run("test success empty dir", func(t *testing.T) {

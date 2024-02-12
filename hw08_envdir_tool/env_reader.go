@@ -36,7 +36,7 @@ func ReadDir(dir string) (Environment, error) {
 	env := make(Environment)
 
 	for _, file := range files {
-		if file.IsDir() {
+		if file.IsDir() || strings.Contains(file.Name(), "=") {
 			continue
 		}
 
@@ -74,5 +74,5 @@ func readFirstLine(filepath string) (string, error) {
 
 	line = bytes.ReplaceAll(line, []byte{0}, []byte{10})
 
-	return string(line), nil
+	return strings.TrimRight(string(line), " \t"), nil
 }
